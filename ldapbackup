@@ -1,0 +1,68 @@
+#!/bin/sh
+ditfile=$(hostname)_dit-$( date +%y%m%d ).ldif
+configfile=cn-config_dit-$( date +%y%m%d ).ldif
+ditldiffile=$(hostname)_ldifdit-$( date +%y%m%d ).ldif
+userdomain='' # Ex. "dc=example,dc=net"
+configdomain='' # Ex. "cn=config"
+bkpdir='' # Ex /var/local/backups
+logfile='' # Ex /var/log/ldapbkp.log
+time=$(date +%T)
+date=$(date "+%F %T")
+purgefile=""
+
+info="$date Complete users and configuration backup in $(hostname -f)"
+echo $info | tee -a $logfile
+
+# LDAP USER BACKUP
+info="$date Full users DIT backup with ldapsearch"
+echo $info | tee -a $logfile
+ldapsearch -L -Y EXTERNAL -H ldapi:/// -b $userdomain "*" "+" > $bkpdir/$ditldiffile
+ if [ $? != 0 ]; then
+        info="$time - ocurrio un error en el backup del DIT, revisar"
+        echo $info | tee -a $logfile
+        exit 1
+ else
+        info="$time - User tree backup compression"
+        echo $info | tee -a $logfile
+        gzip -f $bkpdir/$ditldiffile
+                if [ $? != 0 ]; then
+                        info="$time - An error has occurred"
+                        echo $info | tee -a $logfile
+                else
+                        info="$time - Successfull tree backup"
+                        echo $info | tee -a $logfile
+                fi
+ fi
+
+# LDAP CONFIG BACKUP
+info="$time Full config DIT backup with ldapsearch"
+echo $info | tee -a $logfile
+ldapsearch -L -Y EXTERNAL -H ldapi:/// -b $configdomain "*" "+" > $bkpdir/$configfile
+ if [ $? != 0 ]; then
+        info="$time - ocurrio un error en el backup de la configuracion, revisar"
+        echo $info | tee -a $logfile
+        exit 1
+ else
+        info="$time - Config tree backup compression"
+        echo $info | tee -a $logfile
+        gzip -f $bkpdir/$configfile
+                if [ $? != 0 ]; then
+                        info="$time - An error has occurred"
+                        echo $info | tee -a $logfile
+                        exit 1
+                else
+                        info="$time - Successfull tree backup"
+                        echo $info | tee -a $logfile
+                 fi
+ fi
+
+# BACKUP PURGE
+ if [ -e $purgefile ]; then
+        bash $purgefile
+ else
+        info="$hora No se encontro archivo de purga de backups"
+        echo $info | tee -a $logfile
+        exit 1
+ fi
+
+exit 0
