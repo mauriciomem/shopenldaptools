@@ -1,0 +1,83 @@
+#!/bin/bash
+
+host="ldaps://localhost"
+usuario="cn=monitor"
+dominio="dc=uba,dc=ar"
+passwd='5j!6&4Fo$PnGq#jf'
+estadlog=/var/log/zabbix-agent/estadisticas.log
+#array cn=Operaciones
+OpArray=("Modify" "Bind" "Unbind" "Add" "Delete" "Compare" "Search" "Modrdn" "Abandon" "Extended")
+#array cn=Statistics
+EsArray=("Bytes" "PDU" "Entries" "Referrals")
+#array cn=Waiters
+WaArray=("Read" "Write")
+
+truncate -s 0 $estadlog
+
+echo "cn=Operations por Minuto y por Segundo" >> $estadlog
+for op in ${OpArray[@]}; do
+        if [ ! -z "$estadlog" ]; then
+                echo "cn=$op,cn=Operations" >> $estadlog
+                vactual=`ldapsearch -H $host -x -D "$usuario,$dominio" -w "$passwd" -b "cn=$op,cn=Operations,cn=Monitor" -s sub "(objectClass=*)" + | grep "monitorOpCompleted:" | awk '{print $NF}'`
+                vanterior=`grep -i "acu$op" $estadlog".prev" | awk '{print $NF}'`
+                opdiffmin=$((vactual - vanterior ))
+                opdiffsec=$(( (vactual - vanterior ) / 60  ))
+                echo acu$op $vactual >> $estadlog
+                echo ""$op"-Min" $opdiffmin >> $estadlog
+                echo ""$op"-Sec" $opdiffsec >> $estadlog
+                totalmin=`expr $totalmin + $opdiffmin`
+                totalsec=`expr $totalsec + $opdiffmin`
+        fi
+done
+echo "cn=Total,cn=Operations" >> $estadlog
+echo "TotalOp-Sec" $totalsec >> $estadlog
+echo "TotalOp-Min" $totalmin >> $estadlog
+
+echo "cn=Statistics por Minuto y por Segundo" >> $estadlog
+for es in ${EsArray[@]}; do
+        if [ ! -z "$estadlog" ]; then
+                echo "cn=$es,cn=Statistics" >> $estadlog
+                vactual=`ldapsearch -H $host -x -D "$usuario,$dominio" -w "$passwd" -b "cn=$es,cn=Statistics,cn=Monitor" -s sub "(objectClass=*)" + | grep "monitorCounter:" | awk '{print $NF}'`
+                vanterior=`grep -i "acu$es" $estadlog".prev" | awk '{print $NF}'`
+                esdiffmin=$((vactual - vanterior))
+                esdiffsec=$(( (vactual - vanterior) / 60  ))
+                echo acu$es $vactual >> $estadlog
+                echo ""$es"-Min" $esdiffmin >> $estadlog
+                echo ""$es"-Sec" $esdiffsec >> $estadlog
+        fi
+done
+
+echo "cn=Total,cn=Connections por Minuto y por Segundo" >> $estadlog
+if [ ! -z "$estadlog" ]; then
+        echo "cn=Total,cn=Connections" >> $estadlog
+        vactual=`ldapsearch -H $host -x -D "$usuario,$dominio" -w "$passwd" -b "cn=Total,cn=Connections,cn=Monitor" -s sub "(objectClass=*)" + | grep "monitorCounter:" | awk '{print $NF}'`
+        vanterior=`grep -i "acuTotal" $estadlog".prev" | awk '{print $NF}'`
+  codiffmin=$((vactual - vanterior))
+  codiffsec=$(( (vactual - vanterior) / 60  ))
+  echo acuTotalCo $vactual >> $estadlog
+  echo ""TotalCo"-Min" $codiffmin >> $estadlog
+  echo ""TotalCo"-Sec" $codiffsec >> $estadlog
+fi
+
+echo "cn=Current,cn=Connectios" >> $estadlog
+if [ ! -z "$estadlog" ]; then
+        valor=`ldapsearch -H $host -x -D "$usuario,$dominio" -w "$passwd" -b "cn=Current,cn=Connections,cn=Monitor" -s sub "(objectClass=*)" + | grep "monitorCounter:" | awk '{print $NF}'`
+  echo "CurrentConnections" $valor  >> $estadlog
+fi
+
+echo "cn=Waiters,cn=Monitor por Minuto y por Segundo" >> $estadlog
+for wa in ${WaArray[@]}; do
+if [ ! -z "$estadlog" ]; then
+        echo "cn=$wa,cn=Connections" >> $estadlog
+        vactual=`ldapsearch -H $host -x -D "$usuario,$dominio" -w "$passwd" -b "cn=$wa,cn=Waiters,cn=Monitor" -s sub "(objectClass=*)" + | grep "monitorCounter:" | awk '{print $NF}'`
+        vanterior=`grep -i "acu$wa" $estadlog".prev" | awk '{print $NF}'`
+  wadiffmin=$((vactual - vanterior ))
+  wadiffsec=$(( (vactual - vanterior ) / 60  ))
+  echo acu$wa $vactual >> $estadlog
+  echo ""$wa"-Min" $wadiffmin >> $estadlog
+  echo ""$wa"-Sec" $wadiffsec >> $estadlog
+fi
+done
+
+# Save last iteration
+cp $estadlog $estadlog".prev"
